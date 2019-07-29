@@ -1,5 +1,6 @@
 import numpy as np
 import mxnet as mx
+from tensorboardX import SummaryWriter
 
 class AccMetric(mx.metric.EvalMetric):
   def __init__(self):
@@ -33,6 +34,7 @@ class LossValueMetric(mx.metric.EvalMetric):
         'lossvalue', axis=self.axis,
         output_names=None, label_names=None)
     self.losses = []
+    # self.writer = SummaryWriter(logdir="./log")
 
   def update(self, labels, preds):
     #label = labels[0].asnumpy()
@@ -44,3 +46,5 @@ class LossValueMetric(mx.metric.EvalMetric):
     self.num_inst += 1.0
     #gt_label = preds[-2].asnumpy()
     #print(gt_label)
+    # print('loss:', loss, 'num_inst:', self.num_inst)
+    # self.writer.add_scalar('loss', loss, self.num_inst)

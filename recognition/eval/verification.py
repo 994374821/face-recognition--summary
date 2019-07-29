@@ -210,7 +210,7 @@ def test(data_set, mx_model, batch_size, nfolds=10, data_extra = None, label_sha
     _data_extra = nd.array(data_extra)
   time_consumed = 0.0
   if label_shape is None:
-    _label = nd.ones( (batch_size,) )
+    _label = nd.ones( (batch_size, 513) )
   else:
     _label = nd.ones( label_shape )
   for i in xrange( len(data_list) ):

@@ -427,7 +427,6 @@ def residual_unit_v3_x(data, num_filter, stride, dim_match, name, bottle_neck, *
     workspace : int
         Workspace used in convolution operator
     """
-    assert(bottle_neck)
     use_se = kwargs.get('version_se', 1)
     bn_mom = kwargs.get('bn_mom', 0.9)
     workspace = kwargs.get('workspace', 256)
@@ -483,8 +482,10 @@ def residual_unit(data, num_filter, stride, dim_match, name, bottle_neck, **kwar
     return residual_unit_v2(data, num_filter, stride, dim_match, name, bottle_neck, **kwargs)
   elif uv==4:
     return residual_unit_v4(data, num_filter, stride, dim_match, name, bottle_neck, **kwargs)
-  else:
+  elif uv==3:
     return residual_unit_v3(data, num_filter, stride, dim_match, name, bottle_neck, **kwargs)
+  else:
+    return residual_unit_v3_x(data, num_filter, stride, dim_match, name, bottle_neck, **kwargs)
 
 def resnet(units, num_stages, filter_list, num_classes, bottle_neck):
     bn_mom = config.bn_mom
@@ -522,7 +523,8 @@ def resnet(units, num_stages, filter_list, num_classes, bottle_neck):
     version_unit = kwargs.get('version_unit', 3)
     act_type = kwargs.get('version_act', 'prelu')
     memonger = kwargs.get('memonger', False)
-    print(version_se, version_input, version_output, version_unit, act_type, memonger)
+    print("version_se:{}, version_input:{}, version_output:{}, version_unit:{}, act_type:{}, memonger:{}" \
+          .format(version_se, version_input, version_output, version_unit, act_type, memonger))
     num_unit = len(units)
     assert(num_unit == num_stages)
     data = mx.sym.Variable(name='data')
@@ -626,6 +628,11 @@ def get_symbol():
                   filter_list = filter_list,
                   num_classes = num_classes,
                   bottle_neck = bottle_neck)
+
+    # plot network architecture
+    digraph = mx.viz.plot_network(net, shape={'data': (1, 3, 224, 224)}, save_format='pdf',
+                                  node_attrs={"shape": "oval", "fixedsize": "false"})
+    digraph.render(filename='fresnet{}_unit{}_se{}'.format(num_layers, config.net_unit, config.net_se))
 
     if config.memonger:
       dshape = (config.per_batch_size, config.image_shape[2], config.image_shape[0], config.image_shape[1])

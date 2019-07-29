@@ -311,3 +311,65 @@ class FaceImageIterList(io.DataIter):
       return ret
 
 
+if __name__=="__main__":
+    import json
+    import matplotlib.pyplot as plt
+    # """
+    train_dataiter = FaceImageIter(
+        batch_size=4,
+        data_shape=(3, 112, 112),
+        path_imgrec="/home/gaomingda/insightface/datasets/ms1m-retinaface-t1/train.rec",
+        shuffle=True,
+        rand_mirror=False,
+        mean=None,
+        cutoff=False,
+        color_jittering=0,
+        images_filter=0,
+    )
+    data_nums = train_dataiter.num_samples()
+    max_id = max(train_dataiter.seq)
+    min_id = min(train_dataiter.seq)
+
+    label, img = train_dataiter.next()
+
+    # test train dataset
+    # import cv2
+    #
+    # for i in range(1000):
+    #     label, img, box, landmark = train_dataiter.next_sample()
+    #     img_ = train_dataiter.imdecode(img)
+    #     cv2.imwrite('/home/gaomingda/insightface/recognition/data/imgs_show/{}.jpg'.format(train_dataiter.cur),
+    #                 np.array(img_.asnumpy(), dtype=np.uint8))
+    labels_cnt = {}
+    labels = []
+    for i in range(data_nums):
+        label, img, box, landmark = train_dataiter.next_sample()
+        labels.append(int(label))
+        if label in labels_cnt:
+            labels_cnt[label] += 1
+        else:
+            labels_cnt[label] = 1
+
+    labels_set = set(labels)
+    max_label = max(labels_set)
+    print('max label: ', max_label)
+
+    len_label_id = len(labels_set)
+    print('len label_id: ', len_label_id)
+
+    counts = np.bincount(np.array(labels))
+    # """
+    # show counts
+    # count = counts.tolist()
+    # plt.bar(range(len(count)), count)
+    # plt.show()
+
+    with open('/home/gaomingda/insightface/datasets/label_cnt.txt', 'wb') as f:
+        for i in range(counts.shape[0]):
+            f.write(str(counts[i]))
+            f.write('\n')
+
+    json.dump(labels_cnt, open("/home/gaomingda/insightface/datasets/label_cnt.json", 'wb'))
+    print("saved label_cnt to json file")
+
+

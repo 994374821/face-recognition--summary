@@ -37,6 +37,14 @@ def DResidual(data, num_out=1, kernel=(3, 3), stride=(2, 2), pad=(1, 1), num_gro
     proj = Linear(data=conv_dw, num_filter=num_out, kernel=(1, 1), pad=(0, 0), stride=(1, 1), name='%s%s_conv_proj' %(name, suffix))
     return proj
     
+def DResidual2(data, num_out=1, kernel=(3, 3), stride=(2, 2), pad=(1, 1), num_group=1, name=None, suffix=''):
+    conv = Conv(data=data, num_filter=num_group, kernel=(1, 1), pad=(0, 0), stride=(1, 1), name='%s%s_conv_sep' %(name, suffix))
+    conv_dw = Conv(data=conv, num_filter=num_group, num_group=num_group, kernel=kernel, pad=pad, stride=stride, name='%s%s_conv_dw' %(name, suffix))
+    proj = Linear(data=conv_dw, num_filter=num_group, kernel=(1, 1), pad=(0, 0), stride=(1, 1), name='%s%s_conv_proj' %(name, suffix))
+    conv_dw1 = Conv(data=proj, num_filter=num_group, num_group=num_group, kernel=kernel, pad=pad, stride=stride, name='%s%s_conv_dw_1' %(name, suffix))
+    proj1 = Linear(data=conv_dw1, num_filter=num_out, kernel=(1, 1), pad=(0, 0), stride=(1, 1), name='%s%s_conv_proj_1' %(name, suffix))
+    return proj1
+    
 def Residual(data, num_block=1, num_out=1, kernel=(3, 3), stride=(1, 1), pad=(1, 1), num_group=1, name=None, suffix=''):
     identity=data
     for i in range(num_block):
@@ -44,7 +52,18 @@ def Residual(data, num_block=1, num_out=1, kernel=(3, 3), stride=(1, 1), pad=(1,
     	conv=DResidual(data=identity, num_out=num_out, kernel=kernel, stride=stride, pad=pad, num_group=num_group, name='%s%s_block' %(name, suffix), suffix='%d'%i)
     	identity=conv+shortcut
     return identity
-        
+    
+def Residual2(data, num_block=1, num_out=1, kernel=(3, 3), stride=(1, 1), pad=(1, 1), num_group=1, name=None, suffix=''):
+    identity=data
+    for i in range(num_block):
+    	shortcut=identity
+    	conv1=DResidual(data=identity, num_out=num_out, kernel=kernel, stride=stride, pad=pad, num_group=num_group, name='%s%s_block' %(name, suffix), suffix='%d'%i)
+    	conv2=DResidual2(data=identity, num_out=num_out, kernel=kernel, stride=stride, pad=pad, num_group=num_group, name='%s%s_block_' %(name, suffix), suffix='%d'%i)
+    	combine = mx.symbol.Concat(conv1, conv2, dim =1 )
+    	conv = mx.sym.Convolution(data=combine, num_filter=num_out, kernel=(1,1), stride=(1,1), pad=(0, 0), name='%s_conv_%d' %(name, i))
+    	conv = conv + shortcut
+    	identity=conv
+    return identity
 
 def get_symbol():
     num_classes = config.emb_size
@@ -68,5 +87,11 @@ def get_symbol():
     conv_6_sep = Conv(conv_5, num_filter=512, kernel=(1, 1), pad=(0, 0), stride=(1, 1), name="conv_6sep")
 
     fc1 = symbol_utils.get_fc1(conv_6_sep, num_classes, fc_type)
+
+    # plot network architecture
+    digraph = mx.viz.plot_network(fc1, shape={'data': (1, 3, 112, 112)}, save_format='pdf',
+                                  node_attrs={"shape": "oval", "fixedsize": "false"})
+    digraph.render(filename='fmobilefacenet')
+
     return fc1
 

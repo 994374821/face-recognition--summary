@@ -75,7 +75,7 @@ def count_flops(sym, **data_shapes):
       input_nodeid = node['inputs'][0][0]
       input_shape = nodeid_shape[input_nodeid]
       output_filter = output_shape[1]
-      input_filter = input_shape[1]*input_shape[2]*input_shape[3]
+      input_filter = input_shape[1]*input_shape[2]*input_shape[3] if len(input_shape)==4 else input_shape[1]
       #assert len(input_shape)==4 and input_shape[2]==1 and input_shape[3]==1
       flops = count_fc_flops(input_filter, output_filter, attr)
     #print(node, flops)
@@ -84,7 +84,11 @@ def count_flops(sym, **data_shapes):
   return FLOPs
 
 def flops_str(FLOPs):
-  preset = [ (1e12, 'T'), (1e9, 'G'), (1e6, 'M'), (1e3, 'K') ]
+  #preset = [ (1e12, 'T'), (1e9, 'G'), (1e6, 'M'), (1e3, 'K') ]
+  M = 1024**2
+  G = 1024**3
+  T = 1024**4
+  preset = [ (T, 'T'), (G, 'G'), (M, 'M'), (1024, 'K') ]
 
   for p in preset:
     if FLOPs//p[0]>0:

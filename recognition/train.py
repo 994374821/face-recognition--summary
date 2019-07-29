@@ -26,10 +26,15 @@ import fmobilefacenet
 import fmobilenet
 import fmnasnet
 import fdensenet
+import octconv_seresnetv2
+import octconv_mobilefacenet
+import fmobilefacenet_mb
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+from tensorboardX import SummaryWriter
 
 
 args = None
@@ -62,6 +67,11 @@ def parse_args():
 
 def get_symbol(args):
   embedding = eval(config.net_name).get_symbol()
+  # save embedding graph
+  # plot network architecture
+  # digraph = mx.viz.plot_network(embedding, shape={'data': (1,3,112,112)}, save_format='png')
+  # digraph.render(filename='debug_embedding_{}'.format(config.net_unit))
+
   all_label = mx.symbol.Variable('softmax_label')
   gt_label = all_label
   is_softmax = True
@@ -145,6 +155,20 @@ def get_symbol(args):
   out = mx.symbol.Group(out_list)
   return out
 
+def save_model(model, prefix, msave):
+    # print("save model to {}, {}".format(prefix, msave))
+    arg, aux = model.get_params()
+    if config.ckpt_embedding:
+        all_layers = model.symbol.get_internals()
+        _sym = all_layers['fc1_output']
+        _arg = {}
+        for k in arg:
+            if not k.startswith('fc7'):
+                _arg[k] = arg[k]
+        mx.model.save_checkpoint(prefix, msave, _sym, _arg, aux)
+    else:
+        mx.model.save_checkpoint(prefix, msave, model.symbol, arg, aux)
+
 def train_net(args):
     ctx = []
     cvd = os.environ['CUDA_VISIBLE_DEVICES'].strip()
@@ -198,7 +222,8 @@ def train_net(args):
     if config.count_flops:
       all_layers = sym.get_internals()
       _sym = all_layers['fc1_output']
-      FLOPs = flops_counter.count_flops(_sym, data=(1,3,image_size[0],image_size[1]))
+      # FLOPs = flops_counter.count_flops(_sym, data=(1,3,image_size[0],image_size[1]))
+      FLOPs = flops_counter.count_flops(_sym, data=(1, 3, 112, 112))
       _str = flops_counter.flops_str(FLOPs)
       print('Network FLOPs: %s'%_str)
 
@@ -246,8 +271,10 @@ def train_net(args):
       if config.ce_loss:
         metric2 = LossValueMetric()
         eval_metrics.append( mx.metric.create(metric2) )
+        
 
-    if config.net_name=='fresnet' or config.net_name=='fmobilefacenet':
+
+    if config.net_name=='fresnet' or config.net_name=='fmobilefacenet' or config.net_name=='octconv':
       initializer = mx.init.Xavier(rnd_type='gaussian', factor_type="out", magnitude=2) #resnet style
     else:
       initializer = mx.init.Xavier(rnd_type='uniform', factor_type="in", magnitude=2)
@@ -278,7 +305,8 @@ def train_net(args):
         results.append(acc2)
       return results
 
-
+    # tb_log_dir = "./log"
+    # writer = SummaryWriter(log_dir=tb_log_dir)
 
     highest_acc = [0.0, 0.0]  #lfw and target
     #for i in xrange(len(ver_list)):
@@ -287,10 +315,18 @@ def train_net(args):
     save_step = [0]
     lr_steps = [int(x) for x in args.lr_steps.split(',')]
     print('lr_steps', lr_steps)
+    warm_up = True
+
     def _batch_callback(param):
       #global global_step
       global_step[0]+=1
       mbatch = global_step[0]
+
+      # warm up
+      warm_up_step = 999  # args.batch_size * 4 * 5.
+      if warm_up and mbatch < warm_up_step:
+          opt.lr = args.lr * mbatch / warm_up_step
+
       for step in lr_steps:
         if mbatch==step:
           opt.lr *= 0.1
@@ -299,7 +335,7 @@ def train_net(args):
 
       _cb(param)
       if mbatch%1000==0:
-        print('lr-batch-epoch:',opt.lr,param.nbatch,param.epoch)
+        print('lr-batch-epoch:', opt.lr, param.nbatch, param.epoch)
 
       if mbatch>=0 and mbatch%args.verbose==0:
         acc_list = ver_test(mbatch)
@@ -347,6 +383,8 @@ def train_net(args):
           else:
             mx.model.save_checkpoint(prefix, msave, model.symbol, arg, aux)
         print('[%d]Accuracy-Highest: %1.5f'%(mbatch, highest_acc[-1]))
+        # save each verbose
+        save_model(model, prefix, 2)
       if config.max_steps>0 and mbatch>config.max_steps:
         sys.exit(0)
 
